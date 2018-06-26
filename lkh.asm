@@ -3,15 +3,30 @@
             DW  523,554,587,622,659,698,740,784,831,880,932,988
             DW  1046,1109,1175,1245,1318,1397,1480,1568,1661,1760,1865,1976
     TABKEY  DB  '1','!','2','@','3','4','$','5','%','6','^','7'
-            DB  'q','Q','w','e','E','r','R','t','T','y','Y','u'
-            DB  'a','A','s','d','D','f','F','g','G','h','H','j'
+            DB  'q','Q','w','W','e','r','R','t','T','y','Y','u'
+            DB  'a','A','s','S','d','f','F','g','G','h','H','j'
 
     TABSIZE     DW  36
     PLAYCOUNT   DB  0;自动演奏计数n
-    EXAMPLAY    DB  '1',1,'1',1,'5',1,'5',1,'6',1,'6',1,'5',2,'4',1,'4',1,'3',1,'3',1,'2',1,'2',1,'1',2,'$'
-    ;EXAMPLAY    DB  '1',2,'5',2,'6',2,'5',2,'4',2,'3',2,'2',2,'1',2,'$'
-    ERRORMSG    DB  '<-$'
-    STARTMSG    DB  '->$'
+    PLAY1   DB  'q',2,'q',2,'t',2,'t',2,'y',2,'y',2,'t',4,'r',2,'r',2,'e',2,'e',2,'w',2,'w',2,'q',4  ;小星星
+            DB  't',2,'t',2,'r',2,'r',2,'e',2,'e',2,'w',4,'t',2,'t',2,'r',2,'r',2,'e',2,'e',2,'w',4
+            DB  'q',2,'q',2,'t',2,'t',2,'y',2,'y',2,'t',4,'r',2,'r',2,'e',2,'e',2,'w',2,'w',2,'q',4,'$'
+            
+    PLAY2   DB  'd',8,'s',8,'a',8,'u',8,'y',8,'t',8,'y',8  ;卡农
+            DB  'u',8, 'a',2,'u',2,'a',2,'e',2, 't',4,'y',2,'u',2, 'a',2,'u',2,'a',2,'e',2, 'g',2,'d',2,'g',2,'h',2, 'f',2,'d',2,'s',2,'f',2, 'd',2,'s',2,'a',2,'u',2
+            DB  'y',2,'t',2,'r',2,'a',2, 'u',8, 'y',2,'t',2,'r',2,'a',2, 'u',2,'t',2,'a',2,'u',2, 'g',2,'d',1,'f',1,'g',2,'d',1,'f',1, 'g',1,'t',1,'y',1,'u',1,'a',1,'s',1,'d',1,'f',1, 'd',2,'a',1,'s',1,'d',2,'d',1,'f',1
+            DB  't',1,'y',1,'t',1,'e',1,'t',1,'a',1,'u',1,'a',1, 'y',2,'a',1,'u',1,'y',2,'t',1,'r',1, 't',1,'r',1,'e',1,'r',1,'t',1,'y',1,'u',1,'a',1, 'y',2,'a',1,'u',1,'a',2,'u',1,'y',1, 'u',1,'y',1,'u',1,'a',1,'s',1,'d',1,'f',1,'g',1
+            DB  
+            DB  '$'
+    PLAY3   DB
+            DB  '$'
+    ERRORMSG    DB  '...ERROR!$'
+    STARTMSG    DB  'Welcome  in ',0ah,0dh          ;提示信息              
+                DB  '1.EXAMPLAY0',0ah,0dh
+                DB  '2.EXAMPLAY1',0ah,0dh
+                DB  '0.Quit:',0ah,0dh,'$'
+    PLAYMSG     DB  '->$'
+    ENDMSG      DB  '<-$'
 	CUR  DB  0   ;应按的键
 DATA ENDS
 
@@ -22,24 +37,45 @@ STCK ENDS
 CODE SEGMENT
     ASSUME CS:CODE,DS:DATA
 START:
+
+PROC1 proc
     MOV AX,DATA
     MOV DS,AX
-    LEA DI,EXAMPLAY;乐曲偏移地址给DI
-    JMP PLAY
+    CALL FAR PTR CLEAR
+    LEA DX,STARTMSG;        输出提示信息,选择界面
+    MOV AH,09H;
+    INT 21H;
+    MOV AH,01H;  接受按键
+    INT 21H;
+    CMP AL,'0';        
+    JE FAR PTR QUIT;     退出
+    CMP AL,'1'
+    JE CHOICE0
+    CMP AL,'2'
+    JE CHOICE1
+
+CHOICE0:
+    LEA DI,PLAY1; 乐曲1 偏移地址给DI
+    CALL PLAY
+    JMP START
+CHOICE1:
+    LEA DI,PLAY2; 乐曲2 偏移地址给DI
+    CALL PLAY
+    JMP START
+CHOICE2:
+    LEA DI,PLAY3; 乐曲3 偏移地址给DI
+    CALL PLAY
+    JMP START
 QUIT:
-    POP DX
-    POP CX
-    POP BX
-    POP AX
-    MOV AH,4CH
+    MOV AH,4CH 
     INT 21H
 
-PLAY:
+PLAY proc
     PUSH AX
     PUSH BX
     PUSH CX
     PUSH DX
-    LEA DX,STARTMSG
+    LEA DX,PLAYMSG
     MOV AH,09H
     INT 21H
     MOV PLAYCOUNT,0
@@ -48,9 +84,7 @@ COUNT:    ;遍历音符
     MOV BH,00H
     MOV DL,DI[BX];     DL当前要放的音
     CMP DL,'$'
-    JZ QUIT
-   ; MOV AH,02H
-   ; INT 21H
+    JZ PQUIT
     MOV CX,TABSIZE;表长
     MOV BX,0000H ;
 FINDKEY:
@@ -65,17 +99,12 @@ FIND:		;得值于TABKEY[BX]->DL  BX是key中找到的位置
     MOV AH,02H
     INT 21H
     ;频率-》BX 时长-》CX
-    ;MOV CL,DI[PLAYCOUNT+1] 错 改成下三句
     MOV DX,BX
     ADD PLAYCOUNT,1
     MOV BL,PLAYCOUNT
 	MOV BH,00H
-    MOV CL,EXAMPLAY[BX]
+    MOV CL,DI[BX]
 	MOV BX,DX
-    MOV DL,CL
-    ADD DL,30H
-    MOV AH,02H
-    INT 21H
     MOV CH,00H ;  CX为持续时间  BX是key中找到的位置  
     JMP OUT_VOI
 NEXT:
@@ -90,7 +119,12 @@ ERROR:
     INT 21H
     POP AX
     POP DX
-    JMP QUIT
+PQUIT:
+    POP DX
+    POP CX
+    POP BX
+    POP AX
+    RET
 
 OUT_VOI:  
     PUSH AX
@@ -122,7 +156,7 @@ THEN:
     AND AL,0FCH;  
     OUT 61H,AL;
 
-PUSH CX
+    PUSH CX
 DELAYLOOP3:
         MOV CX,1
         PUSH CX;
@@ -133,7 +167,7 @@ DELAYLOOP3:
         LOOP DELAYLOOP4  
         POP CX; 
         LOOP DELAYLOOP3
-POP CX
+    POP CX
     POP DX
     POP AX
     JMP NEXT
@@ -154,20 +188,9 @@ DELAY:
         POP AX
         PUSH AX
         POP AX
-        PUSH AX
-        POP AX
-        PUSH AX
-        POP AX
-        PUSH AX
-        POP AX
-        PUSH AX
-        POP AX
-        PUSH AX
-        POP AX
-        PUSH AX
-        POP AX
-        PUSH AX
-        POP AX     
+        ; PUSH AX
+        ; POP AX
+   
         LOOP DELAYLOOP2  
         POP CX;
         INT 21H  
@@ -175,6 +198,17 @@ DELAY:
     POP DX
     POP AX
     JMP THEN
+play endp
 
+CLEAR PROC;清屏
+    PUSH AX
+    MOV AH,00H
+    MOV AL,03H
+    INT 10H
+    POP AX
+    RET
+CLEAR ENDP
+
+PROC1 ENDP
 CODE ENDS
     END START
