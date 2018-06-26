@@ -9,8 +9,9 @@ DATA SEGMENT
       ;          DB  10H,'Q',11H,12H,'E',13H,'R',14H,'T',15H,'Y',16H
       ;          DB  1eH,'A',1fH,20H,'D',21H,'F',22H,'G',23H,'H',24H
       TABSCAN  DB  02H,02H,03H,03H,04H,05H,05H,06H,06H,07H,07H,08H
-               DB  10H,10H,11H,12H,12H,13H,13H,14H,14H,15H,15H,16H
-               DB  1eH,1eH,1fH,20H,20H,21H,21H,22H,22H,23H,23H,24H
+               DB  10H,10H,11H,11H,12H,13H,13H,14H,14H,15H,15H,16H
+               DB  1eH,1eH,1fH,1fH,20H,21H,21H,22H,22H,23H,23H,24H
+      SHIFT       DB  00H
 DATA ENDS
 
 CODE SEGMENT
@@ -48,33 +49,31 @@ int9:
       call dword ptr ds:[0]
 
       mov bl, al ;保存al
-press:      ;按下事件  
-      ; push ax
-      ; ;显示按下的字符
-      ; mov di,dx
-      ; mov dl,TABKEY[di]
-      ; mov ah,2
-      ; int 21H
+press:      ;按下或松开事件  
       
-      ; pop ax
-      ; ;显示按下的键的扫描码
-      ; mov dl,ah;
-      ; push ax
-      ; mov ah,2
-      ; int 21H
-      ; pop ax
 
       ;显示按下的扫描码
-      push ax
-      mov dl,al
-      mov ah,2
-      int 21H
-      pop ax
-
-      ; cmp al,2aH  ;2aH是shift的扫描码
-      ; jnz VOICE
-      ; mov dx,1    ;用dx记录shift状态 1为按下
-
+      ; push ax
+      ; mov dl,al
+      ; mov ah,2
+      ; int 21H
+      ; pop ax
+JUDGE0:
+      cmp al,0bH  ;判断是否按下0  0的扫描码是0bH  按下0结束程序
+      jnz JUDGE1
+      jmp press_end
+JUDGE1:     ;判断是否为按下SHIFT
+      cmp al,2aH  ;2aH是SHIFT的扫描码
+      jnz JUDGE2
+      mov dl,1
+      mov SHIFT,dl    ;用dx记录SHIFT状态 1为按下
+      jmp int9ret
+JUDGE2:     ;判断是否为松开SHIFT
+      cmp al,0aaH  ;aaH是SHIFT的断码
+      jnz VOICE
+      mov dl,0
+      mov SHIFT,dl    ;用dx记录SHIFT状态 0为松开
+      jmp int9ret
 VOICE:     
       ;cmp al,02H ; 02h是1的扫描码//
       ;在TABSCAN中查找有没有与按下的键的扫描码对应的值
@@ -91,29 +90,35 @@ VOICE:
       
       jnz release
       
+      ;计算输入字符在tabscan中对应的偏移量
       dec di
       mov ax,di
       mov di,offset TABSCAN
-      sub ax,di
+      sub ax,di   ;将初步偏移量放入ax中
 
-      ;输入字符在tabscan中对应的偏移量
-      ; push ax
-      ; add al,30H
-      ; mov dl,al
-      ; mov ah,2
-      ; int 21H
-      ; pop ax
+      ;检测按下字符时SHIFT的状态
+      mov dl,SHIFT
+      cmp dl,1
+      jnz ORIGIN  ;不等于1  跳转到ORIGIN（不做升调处理）
+      ;否则升调（除了其中6种情况）
+      mov dl,bl   ;扫描码放入dl中
+      cmp dl,04H  ;判断是不是SHIFT+3
+      jz release
+      cmp dl,12H  ;判断是不是SHIFT+e
+      jz release
+      cmp dl,20H  ;判断是不是SHIFT+d
+      jz release
+      cmp dl,08H  ;判断是不是SHIFT+7
+      jz release
+      cmp dl,16H  ;判断是不是SHIFT+u
+      jz release
+      cmp dl,24H  ;判断是不是SHIFT+j
+      jz release
 
-      ; push ax
-      ; add ah,30H
-      ; mov dl,ah
-      ; mov ah,2
-      ; int 21H
-      ; pop ax
-      ;输入字符在tabscan中对应的偏移量
+      ;升调处理
+      inc ax
 
-
-
+ORIGIN:
       mov di,ax
       ;add di,di
       ;mov dx,di   ;用dx暂存频率表TABVAL的偏移量
@@ -123,13 +128,17 @@ VOICE:
       ;jne release
       
       push ax
-      
-      
+      push bx
+      ;显示按下的键
+      mov bx,di
+      mov dl,TABKEY[bx]
+      mov ah,2
+      int 21H
       ;发声
-      add di,di
+      add bx,bx
       mov ax,0000H;           常数120000H做被除数  
       mov dx,0012H; 
-      mov cx,TABVAL[di]
+      mov cx,TABVAL[bx]
       div cx;      计算频率值  
 
       mov dx,ax   ;              将之存入DX寄存器  
@@ -144,8 +153,9 @@ VOICE:
       out 42H,al;写低字节，然后就响了
 
       
-     
+      pop bx
       pop ax
+      
       jmp int9ret
 
 release:    ;释放事件
@@ -167,8 +177,8 @@ release:    ;释放事件
       jmp int9ret
 
  press_end:
-      cmp bl, 0bh ;4Fh是end键的扫描码;0bh是0的扫描码
-      jne int9ret
+      ; cmp bl, 0bh ;4Fh是end键的扫描码;0bh是0的扫描码
+      ; jne int9ret
       ;处理END，使程序结束，注意在此要恢复中断向量
       mov ax,0
       mov es,ax
@@ -181,7 +191,8 @@ release:    ;释放事件
       mov ax,4c00h
       int 21h
 
-int9ret:pop es
+int9ret:
+      pop es
       pop dx
       pop bx
       pop ax
