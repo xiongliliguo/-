@@ -105,7 +105,7 @@ COUNT:    ;遍历音符
     CMP DL,'$'
     JZ PQUIT
     MOV CX,TABSIZE;表长
-    MOV BX,0000H ;
+    MOV BX,0000H ;;
 FINDKEY:
     CMP DL,TABKEY[BX]
     JZ FIND
