@@ -1,5 +1,5 @@
 DATA SEGMENT
-      INPROG DW 4 DUP(?)
+      INPROG DW 2 DUP(?)
       TABVAL   DW  262,277,294,311,330,349,370,392,415,440,466,494
                DW  523,554,587,622,659,698,740,784,831,880,932,988
                DW  1046,1109,1175,1245,1318,1397,1480,1568,1661,1760,1865,1976
@@ -22,35 +22,36 @@ START:
       mov ax,DATA
       mov ds,ax
 
-     ; 改中断例程入口地址;
+     ; 改中断例程入口地址
       mov ax,0
       mov es,ax
       push es:[9*4]
       pop ds:[0]
       push es:[9*4+2]
       pop ds:[2]
-      mov word ptr es:[9*4],offset int9
+      mov word ptr es:[9*4],offset NEWINT9
       mov es:[9*4+2],cs
-loopMain:
-      jmp loopMain   ;死循环，等待中断到来
+LOOPMAIN:
+      jmp LOOPMAIN   ;死循环，等待中断到来
 
 ; 定义中断例程
-int9:
+NEWINT9:
       push ax
       push bx
       push dx
       push es
-      in al,60h
+      in al,60h   ;从60H端口获取扫描码
       pushf
       pushf
       pop bx
       and bh,11111100b
       push bx
       popf
-      call dword ptr ds:[0]
+      call dword ptr ds:[0]   ;调用原int9中断
 
       mov bl, al ;保存al
-press:      ;按下或松开事件  
+
+MAIN:      ;按下或松开事件处理主要内容
       
 
       ;显示按下的扫描码
@@ -62,19 +63,19 @@ press:      ;按下或松开事件
 JUDGE0:
       cmp al,0bH  ;判断是否按下0  0的扫描码是0bH  按下0结束程序
       jnz JUDGE1
-      jmp press_end
+      jmp EXIT
 JUDGE1:     ;判断是否为按下SHIFT
       cmp al,2aH  ;2aH是SHIFT的扫描码
       jnz JUDGE2
       mov dl,1
       mov SHIFT,dl    ;用dx记录SHIFT状态 1为按下
-      jmp int9ret
+      jmp EXITNEWINT9
 JUDGE2:     ;判断是否为松开SHIFT
       cmp al,0aaH  ;aaH是SHIFT的断码
       jnz VOICE
       mov dl,0
       mov SHIFT,dl    ;用dx记录SHIFT状态 0为松开
-      jmp int9ret
+      jmp EXITNEWINT9
 VOICE:     
       ;cmp al,02H ; 02h是1的扫描码//
       ;在TABSCAN中查找有没有与按下的键的扫描码对应的值
@@ -157,14 +158,14 @@ ORIGIN:
       pop bx
       pop ax
       
-      jmp int9ret
+      jmp EXITNEWINT9
 
 release:    ;释放事件
       pop es
       pop ax 
 
       ; cmp al,82h ; 82h是1的断码
-      ; jne press_end
+      ; jne EXIT
       
       push ax
       
@@ -175,12 +176,12 @@ release:    ;释放事件
 
 
       pop ax
-      jmp int9ret
+      jmp EXITNEWINT9
 
- press_end:
-      ; cmp bl, 0bh ;4Fh是end键的扫描码;0bh是0的扫描码
-      ; jne int9ret
-      ;处理END，使程序结束，注意在此要恢复中断向量
+ EXIT:
+      ; cmp bl, 0bh ;4Fh是EXIT键的扫描码;0bh是0的扫描码
+      ; jne EXITNEWINT9
+      ;处理EXIT，使程序结束，注意在此要恢复中断向量
       mov ax,0
       mov es,ax
 
@@ -189,10 +190,10 @@ release:    ;释放事件
       push ds:[2]
       pop es:[9*4+2]
 
-      mov ax,4c00h
+      mov ah,4ch
       int 21h
 
-int9ret:
+EXITNEWINT9:      ;结束该次响应9
       pop es
       pop dx
       pop bx
