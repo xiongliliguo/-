@@ -22,7 +22,7 @@ START:
       mov ax,DATA
       mov ds,ax
 
-     ; 改中断例程入口地址
+     ; 改中断例程入口地址;
       mov ax,0
       mov es,ax
       push es:[9*4]
