@@ -1,4 +1,5 @@
 ﻿ DATA SEGMENT
+    int9s   DW  2   dup(?)
     TABVAL  DW  262,277,294,311,330,349,370,392,415,440,466,494
             DW  523,554,587,622,659,698,740,784,831,880,932,988
             DW  1046,1109,1175,1245,1318,1397,1480,1568,1661,1760,1865,1976
@@ -8,6 +9,7 @@
 
     TABSIZE     DW  36
     PLAYCOUNT   DB  0;自动演奏计数n
+    break   db  0
     PLAY1   DB  'q',2,'q',2,'t',2,'t',2,'y',2,'y',2,'t',4,'r',2,'r',2,'e',2,'e',2,'w',2,'w',2,'q',4  ;小星星
             DB  't',2,'t',2,'r',2,'r',2,'e',2,'e',2,'w',4,'t',2,'t',2,'r',2,'r',2,'e',2,'e',2,'w',4
             DB  'q',2,'q',2,'t',2,'t',2,'y',2,'y',2,'t',4,'r',2,'r',2,'e',2,'e',2,'w',2,'w',2,'q',4,'$'
@@ -41,6 +43,9 @@ START:
 PROC1 proc
     MOV AX,DATA
     MOV DS,AX
+restart:
+    mov al,0
+    mov break,al
     CALL FAR PTR CLEAR
     LEA DX,STARTMSG;        输出提示信息,选择界面
     MOV AH,09H;
@@ -53,19 +58,20 @@ PROC1 proc
     JE CHOICE0
     CMP AL,'2'
     JE CHOICE1
+    jmp restart
 
 CHOICE0:
     LEA DI,PLAY1; 乐曲1 偏移地址给DI
     CALL PLAY
-    JMP START
+    JMP restart
 CHOICE1:
     LEA DI,PLAY2; 乐曲2 偏移地址给DI
     CALL PLAY
-    JMP START
+    JMP restart
 CHOICE2:
     LEA DI,PLAY3; 乐曲3 偏移地址给DI
     CALL PLAY
-    JMP START
+    JMP restart
 QUIT:
     MOV AH,4CH 
     INT 21H
@@ -75,11 +81,24 @@ PLAY proc
     PUSH BX
     PUSH CX
     PUSH DX
+
+    mov ax,0
+    mov es,ax
+    push es:[9*4]
+    pop ds:[0]
+    push es:[9*4+2]
+    pop ds:[2]
+    mov word ptr es:[9*4],offset myint9
+    mov es:[9*4+2],cs
+
     LEA DX,PLAYMSG
     MOV AH,09H
     INT 21H
     MOV PLAYCOUNT,0
 COUNT:    ;遍历音符
+    mov bl,break
+    cmp bl,1
+    je PQUIT
     MOV BL,PLAYCOUNT
     MOV BH,00H
     MOV DL,DI[BX];     DL当前要放的音
@@ -120,6 +139,14 @@ ERROR:
     POP AX
     POP DX
 PQUIT:
+
+    mov ax,0
+    mov es,ax
+    push ds:[0]
+    pop es:[9*4]
+    push ds:[2]
+    pop es:[9*4+2]
+
     POP DX
     POP CX
     POP BX
@@ -188,9 +215,6 @@ DELAY:
         POP AX
         PUSH AX
         POP AX
-        ; PUSH AX
-        ; POP AX
-   
         LOOP DELAYLOOP2  
         POP CX;
         INT 21H  
@@ -210,5 +234,31 @@ CLEAR PROC;清屏
 CLEAR ENDP
 
 PROC1 ENDP
+
+myint9 proc
+    push ax
+    push bx
+    push cx
+    push dx
+
+    in al,60H
+    pushf
+    pushf
+    pop bx
+    and bh,11111100b
+    push bx
+    popf
+    call dword ptr ds:[0]
+    cmp al,01H
+    jne con 
+    mov al,1
+    mov break,al
+con:
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+    iret
+myint9 endp
 CODE ENDS
     END START
