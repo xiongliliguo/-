@@ -7,7 +7,7 @@
             DB  'q','Q','w','W','e','r','R','t','T','y','Y','u'
             DB  'a','A','s','S','d','f','F','g','G','h','H','j'
 
-    TABSIZE     DW  36
+    TABSIZE     DW  36 ;表长
     PLAYCOUNT   dw  0;自动演奏计数n
     break   db  0
     pwait    db  0
@@ -35,7 +35,6 @@ DATA ENDS
 STCK SEGMENT STACK  
           db    100 DUP(?)  
 STCK ENDS 
-
 CODE SEGMENT
     ASSUME CS:CODE,DS:DATA
 START:
