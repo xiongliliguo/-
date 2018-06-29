@@ -2,7 +2,6 @@ data segment
     writebuf db 260 dup(?);用来存写入的内容
     newfile  db 64  dup(?);用来存文件名
     info1    db 'input file name:$'
-    ee db 'aaaa.txt'
 data ends
 
 code  segment
@@ -10,6 +9,12 @@ code  segment
 start:
     mov ax,data
     mov ds,ax
+
+WRITE PROC
+    push ax
+    push bx
+    push cx
+    push dx    
     ;设置最大字符数
     mov al,0fch ;刨除最大字符数、实际字符数数和末尾$
     mov writebuf,al
@@ -41,7 +46,7 @@ start:
     mov ah,9
     int 21h
 
-    mov al,61;刨除最大字符数、实际字符数数和末尾$
+    mov al,61;刨除最大字符数、实际字符数数和末尾 0
     mov newfile,al
     ;设置0AH功能缓冲区首地址
     mov dx,offset newfile
@@ -52,7 +57,7 @@ start:
     mov bx,1
     mov bl,newfile[bx]
     mov bh,0
-    ;在字符串末尾加“$”
+    ;在字符串末尾加 0
     mov al,0
     add bx,2
     mov newfile[bx],al
@@ -79,9 +84,11 @@ start:
     mov ah,40h
     int 21h
 
-
-
-    mov ah,4ch
-    int 21h
+    pop es
+    pop dx
+    pop bx
+    pop ax
+    RET
+WRITE ENDP
 code ends
     end start
