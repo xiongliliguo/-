@@ -24,9 +24,27 @@ readfile proc
         jc  error                  ;若读出错，转error
         mov bx , ax              ;实际读到的字符数送入bx
         mov buf[bx] , '$'          ;在文件结束处放置一“$”符
+        
+        ;将键值对数字从ascii码转成对应的值  比如文件中的0转成内存中的0
+        ; mov cx,bx
+        mov bp,offset buf
+readloop1:
+        mov bl,[bp]
+        cmp bl,'$'      
+        jz close         ;到了文件末尾
+        mov bl,[bp+1]
+        sub bl,30H
+        mov [bp+1],bl
+        add bp,2
+        jmp readloop1
+        
+
+        
+close:
         mov dx , offset buf
         mov ah , 9
         int 21h                            ;显示文件内容
+
         mov bx , handle
         mov ah , 3eh
         int 21h                            ;关闭文件
